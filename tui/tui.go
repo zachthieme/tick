@@ -30,17 +30,19 @@ func doTick() tea.Cmd {
 type Model struct {
 	TotalHosts int
 	Deadline   time.Time
+	today      time.Time
 	result     calc.Result
 	width      int
 	height     int
 }
 
 // New creates a new TUI model.
-func New(totalHosts int, deadline time.Time) Model {
+func New(totalHosts int, deadline time.Time, today time.Time) Model {
 	return Model{
 		TotalHosts: totalHosts,
 		Deadline:   deadline,
-		result:     calc.Calculate(totalHosts, deadline, time.Now()),
+		today:      today,
+		result:     calc.Calculate(totalHosts, deadline, today),
 	}
 }
 
@@ -59,10 +61,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tickMsg:
-		m.result = calc.Calculate(m.TotalHosts, m.Deadline, time.Now())
+		m.result = calc.Calculate(m.TotalHosts, m.Deadline, m.today)
 		return m, doTick()
 	}
 	return m, nil
+}
+
+func commaFormat(n int) string {
+	s := strconv.Itoa(n)
+	if len(s) <= 3 {
+		return s
+	}
+	var result []byte
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			result = append(result, ',')
+		}
+		result = append(result, byte(c))
+	}
+	return string(result)
 }
 
 func (m Model) View() string {
@@ -75,17 +92,17 @@ func (m Model) View() string {
 	if m.result.DeadlinePassed {
 		content = lipgloss.JoinVertical(lipgloss.Center,
 			bigStyle.Render("DEADLINE PASSED"),
-			labelStyle.Render(fmt.Sprintf("%d hosts left", m.result.TotalHosts)),
+			labelStyle.Render(fmt.Sprintf("%s hosts left", commaFormat(m.result.TotalHosts))),
 			labelStyle.Render(fmt.Sprintf("Deadline: %s", m.result.Deadline.Format("2006-01-02"))),
 		)
 	} else {
-		fig := figure.NewFigure(strconv.Itoa(m.result.HostsPerNight), "block", true)
+		fig := figure.NewFigure(strconv.Itoa(m.result.HostsPerNight), "colossal", true)
 		bigNum := bigStyle.Render(fig.String())
 
 		content = lipgloss.JoinVertical(lipgloss.Center,
 			bigNum,
 			labelStyle.Render("hosts per night"),
-			labelStyle.Render(fmt.Sprintf("%d hosts left", m.result.TotalHosts)),
+			labelStyle.Render(fmt.Sprintf("%s hosts left", commaFormat(m.result.TotalHosts))),
 			labelStyle.Render(fmt.Sprintf("Deadline: %s", m.result.Deadline.Format("2006-01-02"))),
 		)
 	}
