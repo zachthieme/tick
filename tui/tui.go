@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"countdown/calc"
+	"tick/calc"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"

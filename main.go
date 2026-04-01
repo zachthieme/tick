@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"countdown/calc"
-	"countdown/tui"
+	"tick/calc"
+	"tick/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -36,7 +36,7 @@ func main() {
 	flag.Parse()
 
 	if *hosts <= 0 || *deadlineStr == "" {
-		fmt.Fprintln(os.Stderr, "Usage: countdown --hosts N --deadline YYYY-MM-DD [--today YYYY-MM-DD] [--once]")
+		fmt.Fprintln(os.Stderr, "Usage: tick --hosts N --deadline YYYY-MM-DD [--today YYYY-MM-DD] [--once]")
 		os.Exit(1)
 	}
 

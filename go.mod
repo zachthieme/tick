@@ -1,4 +1,4 @@
-module countdown
+module tick
 
 go 1.25.5
 
