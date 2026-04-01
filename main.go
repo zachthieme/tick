@@ -68,7 +68,7 @@ func main() {
 		return
 	}
 
-	m := tui.New(*hosts, deadline, today)
+	m := tui.New(*hosts, deadline, today, *todayStr != "")
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)

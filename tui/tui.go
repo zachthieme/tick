@@ -28,21 +28,23 @@ func doTick() tea.Cmd {
 
 // Model is the Bubble Tea model for the countdown TUI.
 type Model struct {
-	TotalHosts int
-	Deadline   time.Time
-	today      time.Time
-	result     calc.Result
-	width      int
-	height     int
+	TotalHosts    int
+	Deadline      time.Time
+	today         time.Time
+	todayOverride bool
+	result        calc.Result
+	width         int
+	height        int
 }
 
 // New creates a new TUI model.
-func New(totalHosts int, deadline time.Time, today time.Time) Model {
+func New(totalHosts int, deadline time.Time, today time.Time, todayOverride bool) Model {
 	return Model{
-		TotalHosts: totalHosts,
-		Deadline:   deadline,
-		today:      today,
-		result:     calc.Calculate(totalHosts, deadline, today),
+		TotalHosts:    totalHosts,
+		Deadline:      deadline,
+		today:         today,
+		todayOverride: todayOverride,
+		result:        calc.Calculate(totalHosts, deadline, today),
 	}
 }
 
@@ -99,12 +101,16 @@ func (m Model) View() string {
 		fig := figure.NewFigure(strconv.Itoa(m.result.HostsPerNight), "colossal", true)
 		bigNum := bigStyle.Render(fig.String())
 
-		content = lipgloss.JoinVertical(lipgloss.Center,
+		lines := []string{
 			bigNum,
 			labelStyle.Render("hosts per night"),
 			labelStyle.Render(fmt.Sprintf("%s hosts left", commaFormat(m.result.TotalHosts))),
-			labelStyle.Render(fmt.Sprintf("Deadline: %s", m.result.Deadline.Format("2006-01-02"))),
-		)
+		}
+		if m.todayOverride {
+			lines = append(lines, labelStyle.Render(fmt.Sprintf("Start: %s", m.today.Format("2006-01-02"))))
+		}
+		lines = append(lines, labelStyle.Render(fmt.Sprintf("Deadline: %s", m.result.Deadline.Format("2006-01-02"))))
+		content = lipgloss.JoinVertical(lipgloss.Center, lines...)
 	}
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
