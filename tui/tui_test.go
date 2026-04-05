@@ -10,6 +10,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func date(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
@@ -238,7 +245,7 @@ func TestIntegrationLifecycle(t *testing.T) {
 func TestTickReReadsHostsFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hosts.txt")
-	os.WriteFile(path, []byte("200\n"), 0o644)
+	writeFile(t, path, "200\n")
 
 	m := New(200, path, date(2026, time.April, 10), date(2026, time.April, 6), true)
 	m = withSize(m, 120, 40)
@@ -249,7 +256,7 @@ func TestTickReReadsHostsFile(t *testing.T) {
 	}
 
 	// Update the file and send a tick.
-	os.WriteFile(path, []byte("150\n"), 0o644)
+	writeFile(t, path, "150\n")
 	updated, _ := m.Update(tickMsg(time.Now()))
 	m = updated.(Model)
 
@@ -292,12 +299,12 @@ func TestDoTickReturnsCommand(t *testing.T) {
 func TestTickHostsFileBadValue(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hosts.txt")
-	os.WriteFile(path, []byte("200\n"), 0o644)
+	writeFile(t, path, "200\n")
 
 	m := New(200, path, date(2026, time.April, 10), date(2026, time.April, 6), true)
 
 	// Write invalid content and tick — should set err but keep old host count.
-	os.WriteFile(path, []byte("not-a-number\n"), 0o644)
+	writeFile(t, path, "not-a-number\n")
 	updated, _ := m.Update(tickMsg(time.Now()))
 	m = updated.(Model)
 

@@ -114,14 +114,14 @@ func (m Model) View() string {
 	if m.result.DeadlinePassed {
 		content = lipgloss.JoinVertical(lipgloss.Center,
 			bigStyle.Render("DEADLINE PASSED"),
+			"",
 			labelStyle.Render(fmt.Sprintf("%s hosts left", calc.CommaFormat(m.result.TotalHosts))),
 			labelStyle.Render(fmt.Sprintf("Deadline: %s", m.result.Deadline.Format("2006-01-02"))),
 		)
 	} else {
 		numStr := strconv.Itoa(m.result.HostsPerNight)
 		bigText := numStr
-		if rendered, err := figlet.Render(numStr, figlet.WithFont("colossal")); err == nil {
-			rendered = strings.TrimRight(rendered, "\n ")
+		if rendered := renderBigNum(numStr); rendered != "" {
 			if maxLineWidth(rendered) <= m.width-4 {
 				bigText = rendered
 			}
@@ -131,6 +131,7 @@ func (m Model) View() string {
 		lines := []string{
 			bigNum,
 			labelStyle.Render("hosts per night"),
+			"",
 			labelStyle.Render(fmt.Sprintf("%s hosts left", calc.CommaFormat(m.result.TotalHosts))),
 		}
 
@@ -150,6 +151,56 @@ func (m Model) View() string {
 	}
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+}
+
+const digitGap = " "
+
+// renderBigNum renders each digit with figlet individually and joins them
+// side-by-side with a small gap. Returns "" if rendering fails.
+func renderBigNum(numStr string) string {
+	var blocks [][]string
+	maxLines := 0
+	for _, ch := range numStr {
+		rendered, err := figlet.Render(string(ch), figlet.WithFont("colossal"))
+		if err != nil {
+			return ""
+		}
+		lines := strings.Split(strings.TrimRight(rendered, "\n "), "\n")
+		blocks = append(blocks, lines)
+		if len(lines) > maxLines {
+			maxLines = len(lines)
+		}
+	}
+
+	// Pad each block to the same height and normalise line widths.
+	for i, blk := range blocks {
+		w := 0
+		for _, l := range blk {
+			if n := runewidth.StringWidth(l); n > w {
+				w = n
+			}
+		}
+		for len(blk) < maxLines {
+			blk = append(blk, "")
+		}
+		for j, l := range blk {
+			if pad := w - runewidth.StringWidth(l); pad > 0 {
+				blk[j] = l + strings.Repeat(" ", pad)
+			}
+		}
+		blocks[i] = blk
+	}
+
+	// Join blocks side-by-side.
+	var out []string
+	for row := range maxLines {
+		var parts []string
+		for _, blk := range blocks {
+			parts = append(parts, blk[row])
+		}
+		out = append(out, strings.Join(parts, digitGap))
+	}
+	return strings.Join(out, "\n")
 }
 
 func maxLineWidth(s string) int {

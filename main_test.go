@@ -9,6 +9,13 @@ import (
 	"testing"
 )
 
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRunOnce(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -181,7 +188,7 @@ func TestRunHelp(t *testing.T) {
 func TestRunHostsFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hosts.txt")
-	os.WriteFile(path, []byte("500\n"), 0o644)
+	writeFile(t, path, "500\n")
 
 	var stdout, stderr bytes.Buffer
 	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--today", "2026-04-06", "--once"}, &stdout, &stderr)
@@ -197,7 +204,7 @@ func TestRunHostsFile(t *testing.T) {
 func TestRunHostsFileJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hosts.txt")
-	os.WriteFile(path, []byte("300\n"), 0o644)
+	writeFile(t, path, "300\n")
 
 	var stdout, stderr bytes.Buffer
 	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--today", "2026-04-06", "--json"}, &stdout, &stderr)
@@ -216,7 +223,7 @@ func TestRunHostsFileJSON(t *testing.T) {
 func TestRunHostsFileMutuallyExclusive(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hosts.txt")
-	os.WriteFile(path, []byte("100\n"), 0o644)
+	writeFile(t, path, "100\n")
 
 	var stdout, stderr bytes.Buffer
 	err := run([]string{"--hosts", "100", "--hosts-file", path, "--deadline", "2026-04-10", "--once"}, &stdout, &stderr)
@@ -239,7 +246,7 @@ func TestRunHostsFileMissing(t *testing.T) {
 func TestRunHostsFileBadContent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "hosts.txt")
-	os.WriteFile(path, []byte("not-a-number\n"), 0o644)
+	writeFile(t, path, "not-a-number\n")
 
 	var stdout, stderr bytes.Buffer
 	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--once"}, &stdout, &stderr)
