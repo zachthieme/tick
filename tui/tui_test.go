@@ -1,21 +1,13 @@
 package tui
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
-
-func writeFile(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func date(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
@@ -83,7 +75,7 @@ func TestView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := New(tt.hosts, "", tt.deadline, tt.today, tt.override)
+			m := New(tt.hosts, nil, tt.deadline, tt.today, tt.override)
 			m = withSize(m, 120, 40)
 			view := m.View()
 
@@ -102,7 +94,7 @@ func TestView(t *testing.T) {
 }
 
 func TestUpdateTickRecalculates(t *testing.T) {
-	m := New(100, "", date(2026, time.April, 10), date(2026, time.April, 6), true)
+	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), true)
 	if m.result.WeekdaysLeft != 5 {
 		t.Fatalf("initial WeekdaysLeft = %d, want 5", m.result.WeekdaysLeft)
 	}
@@ -120,7 +112,7 @@ func TestUpdateTickRecalculates(t *testing.T) {
 
 func TestUpdateTickWithoutOverrideUpdatesToday(t *testing.T) {
 	// Use a date far in the past so it differs from time.Now().
-	m := New(100, "", date(2030, time.January, 10), date(2026, time.January, 1), false)
+	m := New(100, nil, date(2030, time.January, 10), date(2026, time.January, 1), false)
 	original := m.today
 
 	updated, cmd := m.Update(tickMsg(time.Now()))
@@ -135,7 +127,7 @@ func TestUpdateTickWithoutOverrideUpdatesToday(t *testing.T) {
 }
 
 func TestQuitKeys(t *testing.T) {
-	m := New(100, "", date(2026, time.April, 10), date(2026, time.April, 6), false)
+	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), false)
 
 	tests := []struct {
 		name string
@@ -156,14 +148,14 @@ func TestQuitKeys(t *testing.T) {
 }
 
 func TestViewEmptyBeforeResize(t *testing.T) {
-	m := New(100, "", date(2026, time.April, 10), date(2026, time.April, 6), false)
+	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), false)
 	if m.View() != "" {
 		t.Error("View() should be empty before WindowSizeMsg")
 	}
 }
 
 func TestViewNarrowTerminalFallback(t *testing.T) {
-	m := New(100, "", date(2026, time.April, 10), date(2026, time.April, 6), false)
+	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), false)
 	// 30 columns is too narrow for colossal figlet; should fall back to plain number.
 	m = withSize(m, 30, 20)
 	view := m.View()
@@ -178,7 +170,7 @@ func TestViewNarrowTerminalFallback(t *testing.T) {
 
 func TestUpdatePipeline(t *testing.T) {
 	// Full pipeline: New → WindowSizeMsg → tickMsg → View.
-	m := New(100, "", date(2026, time.April, 10), date(2026, time.April, 6), true)
+	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), true)
 
 	// Send WindowSizeMsg.
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -201,7 +193,7 @@ func TestUpdatePipeline(t *testing.T) {
 
 func TestIntegrationLifecycle(t *testing.T) {
 	// Full integration: Init → resize → multiple ticks → deadline crossing.
-	m := New(100, "", date(2026, time.April, 10), date(2026, time.April, 6), true)
+	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), true)
 
 	// Init should return a tick command.
 	cmd := m.Init()
@@ -242,12 +234,11 @@ func TestIntegrationLifecycle(t *testing.T) {
 	}
 }
 
-func TestTickReReadsHostsFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "hosts.txt")
-	writeFile(t, path, "200\n")
+func TestTickReReadsHosts(t *testing.T) {
+	hostCount := 200
+	readHosts := func() (int, error) { return hostCount, nil }
 
-	m := New(200, path, date(2026, time.April, 10), date(2026, time.April, 6), true)
+	m := New(200, readHosts, date(2026, time.April, 10), date(2026, time.April, 6), true)
 	m = withSize(m, 120, 40)
 
 	// Verify initial state.
@@ -255,8 +246,8 @@ func TestTickReReadsHostsFile(t *testing.T) {
 		t.Fatalf("initial TotalHosts = %d, want 200", m.result.TotalHosts)
 	}
 
-	// Update the file and send a tick.
-	writeFile(t, path, "150\n")
+	// Update the count and send a tick.
+	hostCount = 150
 	updated, _ := m.Update(tickMsg(time.Now()))
 	m = updated.(Model)
 
@@ -296,22 +287,28 @@ func TestDoTickReturnsCommand(t *testing.T) {
 	}
 }
 
-func TestTickHostsFileBadValue(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "hosts.txt")
-	writeFile(t, path, "200\n")
+func TestTickReadHostsError(t *testing.T) {
+	readHosts := func() (int, error) {
+		return 0, fmt.Errorf("read failed")
+	}
 
-	m := New(200, path, date(2026, time.April, 10), date(2026, time.April, 6), true)
+	m := New(200, readHosts, date(2026, time.April, 10), date(2026, time.April, 6), true)
+	m = withSize(m, 120, 40)
 
-	// Write invalid content and tick — should set err but keep old host count.
-	writeFile(t, path, "not-a-number\n")
+	// Tick triggers readHosts, which fails.
 	updated, _ := m.Update(tickMsg(time.Now()))
 	m = updated.(Model)
 
 	if m.err == "" {
-		t.Error("expected error after writing invalid hosts file")
+		t.Error("expected error after read failure")
 	}
 	if m.totalHosts != 200 {
 		t.Errorf("totalHosts should remain 200 on error, got %d", m.totalHosts)
+	}
+
+	// Verify stale indicator in view.
+	view := m.View()
+	if !strings.Contains(view, "(stale)") {
+		t.Error("View() should show (stale) indicator when read fails")
 	}
 }

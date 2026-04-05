@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"tick/calc"
@@ -54,6 +58,23 @@ func main() {
 	}
 }
 
+// readHostsFile reads a positive integer from the first line of the file at path.
+func readHostsFile(path string) (int, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	s := strings.TrimSpace(string(data))
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid host count %q: %w", s, err)
+	}
+	if n <= 0 {
+		return 0, fmt.Errorf("host count must be positive, got %d", n)
+	}
+	return n, nil
+}
+
 func run(args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("tick", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -76,17 +97,28 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 
-	if *hosts != 0 && *hostsFile != "" {
+	if fs.NArg() > 0 {
+		return fmt.Errorf("unexpected argument: %s", fs.Arg(0))
+	}
+
+	hostsExplicit := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "hosts" {
+			hostsExplicit = true
+		}
+	})
+
+	if hostsExplicit && *hostsFile != "" {
 		return fmt.Errorf("--hosts and --hosts-file are mutually exclusive")
 	}
 	if *hostsFile != "" {
-		n, err := tui.ReadHostsFile(*hostsFile)
+		n, err := readHostsFile(*hostsFile)
 		if err != nil {
 			return fmt.Errorf("--hosts-file: %w", err)
 		}
 		*hosts = n
 	}
-	if *hosts < 0 {
+	if *hosts < 0 || (*hosts == 0 && hostsExplicit) {
 		return fmt.Errorf("--hosts: value must be positive, got %d", *hosts)
 	}
 	if *hosts == 0 {
@@ -135,10 +167,25 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 
-	m := tui.New(*hosts, *hostsFile, deadline, today, *todayStr != "")
+	var readHosts func() (int, error)
+	if *hostsFile != "" {
+		path := *hostsFile
+		readHosts = func() (int, error) { return readHostsFile(path) }
+	}
+
+	m := tui.New(*hosts, readHosts, deadline, today, *todayStr != "")
 	p := tea.NewProgram(m, tea.WithAltScreen())
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGHUP)
+	go func() {
+		<-sigCh
+		p.Quit()
+	}()
+
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("error: %v", err)
 	}
+	signal.Stop(sigCh)
 	return nil
 }

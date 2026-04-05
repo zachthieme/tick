@@ -3,7 +3,6 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -33,7 +32,7 @@ func doTick() tea.Cmd {
 // Model is the Bubble Tea model for the countdown TUI.
 type Model struct {
 	totalHosts    int
-	hostsFile     string // if set, re-read host count from this file on each tick
+	readHosts     func() (int, error) // if non-nil, called on each tick to refresh host count
 	deadline      time.Time
 	today         time.Time
 	todayOverride bool
@@ -43,33 +42,17 @@ type Model struct {
 	err           string // transient error shown in the status line
 }
 
-// New creates a new TUI model.
-func New(totalHosts int, hostsFile string, deadline time.Time, today time.Time, todayOverride bool) Model {
+// New creates a new TUI model. If readHosts is non-nil, it is called on each
+// tick to refresh the host count.
+func New(totalHosts int, readHosts func() (int, error), deadline time.Time, today time.Time, todayOverride bool) Model {
 	return Model{
 		totalHosts:    totalHosts,
-		hostsFile:     hostsFile,
+		readHosts:     readHosts,
 		deadline:      deadline,
 		today:         today,
 		todayOverride: todayOverride,
 		result:        calc.Calculate(totalHosts, deadline, today),
 	}
-}
-
-// ReadHostsFile reads a positive integer from the first line of the file at path.
-func ReadHostsFile(path string) (int, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return 0, err
-	}
-	s := strings.TrimSpace(string(data))
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, fmt.Errorf("invalid host count %q: %w", s, err)
-	}
-	if n <= 0 {
-		return 0, fmt.Errorf("host count must be positive, got %d", n)
-	}
-	return n, nil
 }
 
 func (m Model) Init() tea.Cmd {
@@ -90,8 +73,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.todayOverride {
 			m.today = calc.DateOnly(time.Now())
 		}
-		if m.hostsFile != "" {
-			if n, err := ReadHostsFile(m.hostsFile); err != nil {
+		if m.readHosts != nil {
+			if n, err := m.readHosts(); err != nil {
 				m.err = err.Error()
 			} else {
 				m.totalHosts = n
@@ -128,11 +111,16 @@ func (m Model) View() string {
 		}
 		bigNum := bigStyle.Render(bigText)
 
+		hostsLabel := fmt.Sprintf("%s hosts left", calc.CommaFormat(m.result.TotalHosts))
+		if m.err != "" {
+			hostsLabel += " (stale)"
+		}
+
 		lines := []string{
 			bigNum,
 			labelStyle.Render("hosts per night"),
 			"",
-			labelStyle.Render(fmt.Sprintf("%s hosts left", calc.CommaFormat(m.result.TotalHosts))),
+			labelStyle.Render(hostsLabel),
 		}
 
 		wd := m.today.Weekday()

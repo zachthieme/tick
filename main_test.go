@@ -124,7 +124,7 @@ func TestRunValidationErrors(t *testing.T) {
 		{
 			name:    "zero hosts",
 			args:    []string{"--hosts", "0", "--deadline", "2026-04-10", "--once"},
-			wantErr: "--hosts is required",
+			wantErr: "value must be positive, got 0",
 		},
 		{
 			name:    "negative hosts via flag",
@@ -252,5 +252,16 @@ func TestRunHostsFileBadContent(t *testing.T) {
 	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--once"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for invalid hosts file content")
+	}
+}
+
+func TestRunUnexpectedArgument(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--hosts", "100", "--deadline", "2026-04-10", "--once", "extra"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error for unexpected argument")
+	}
+	if !strings.Contains(err.Error(), "unexpected argument") {
+		t.Errorf("error = %q, want it to contain 'unexpected argument'", err.Error())
 	}
 }
