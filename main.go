@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"tick/calc"
@@ -181,7 +180,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithInput(stdin), tea.WithOutput(stdout))
 
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGHUP)
+	signal.Notify(sigCh, quitSignals()...)
 	go func() {
 		<-sigCh
 		p.Quit()
