@@ -1,0 +1,11 @@
+version: 2
+builds:
+  - binary: tick
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64

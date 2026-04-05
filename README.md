@@ -28,10 +28,15 @@ tick --hosts 500 --deadline 2026-04-30 --today 2026-04-10
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--hosts` | Yes | Total number of hosts to upgrade |
+| `--hosts` | Yes* | Total number of hosts to upgrade |
+| `--hosts-file` | Yes* | Path to a file containing the host count (re-read each tick in TUI mode) |
 | `--deadline` | Yes | Target date (`YYYY-MM-DD`) |
 | `--today` | No | Override today's date (`YYYY-MM-DD`) |
 | `--once` | No | Print a single line and exit |
+| `--json` | No | Output JSON and exit (for scripting) |
+| `--version` | No | Print version and exit |
+
+\* One of `--hosts` or `--hosts-file` is required. They are mutually exclusive.
 
 ## TUI
 
@@ -49,4 +54,12 @@ d88P"      8888888888
     hosts per night
     500 hosts left
  Deadline: 2026-04-30
+```
+
+## Timezone
+
+All dates use the system's local timezone. If you need a specific timezone, set `TZ` before running:
+
+```bash
+TZ=America/New_York tick --hosts 500 --deadline 2026-04-30
 ```
