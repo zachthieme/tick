@@ -95,12 +95,20 @@ func (m Model) View() string {
 	var content string
 
 	if m.result.DeadlinePassed {
-		content = lipgloss.JoinVertical(lipgloss.Center,
+		hostsLabel := fmt.Sprintf("%s hosts left", calc.CommaFormat(m.result.TotalHosts))
+		if m.err != "" {
+			hostsLabel += " (stale)"
+		}
+		lines := []string{
 			bigStyle.Render("DEADLINE PASSED"),
 			"",
-			labelStyle.Render(fmt.Sprintf("%s hosts left", calc.CommaFormat(m.result.TotalHosts))),
+			labelStyle.Render(hostsLabel),
 			labelStyle.Render(fmt.Sprintf("Deadline: %s", m.result.Deadline.Format("2006-01-02"))),
-		)
+		}
+		if m.err != "" {
+			lines = append(lines, errStyle.Render(m.err))
+		}
+		content = lipgloss.JoinVertical(lipgloss.Center, lines...)
 	} else {
 		numStr := strconv.Itoa(m.result.HostsPerNight)
 		bigText := numStr

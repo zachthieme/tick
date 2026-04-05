@@ -312,3 +312,24 @@ func TestTickReadHostsError(t *testing.T) {
 		t.Error("View() should show (stale) indicator when read fails")
 	}
 }
+
+func TestTickReadHostsErrorDeadlinePassed(t *testing.T) {
+	readHosts := func() (int, error) {
+		return 0, fmt.Errorf("read failed")
+	}
+
+	// Deadline already passed.
+	m := New(200, readHosts, date(2026, time.April, 1), date(2026, time.April, 6), true)
+	m = withSize(m, 120, 40)
+
+	updated, _ := m.Update(tickMsg(time.Now()))
+	m = updated.(Model)
+
+	view := m.View()
+	if !strings.Contains(view, "(stale)") {
+		t.Error("deadline-passed View() should show (stale) indicator when read fails")
+	}
+	if !strings.Contains(view, "read failed") {
+		t.Error("deadline-passed View() should show error message when read fails")
+	}
+}
