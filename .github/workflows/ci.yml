@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [main]
     tags:
       - "v*"
   pull_request:
@@ -18,9 +17,12 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version: "1.25.x"
       - run: go mod verify
-      - run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Go tests
+        run: go test -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Go coverage summary
+        run: go tool cover -func=coverage.out | tail -1
       - name: Check coverage threshold
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep ^total: | awk '{print $3}' | tr -d '%')
@@ -36,27 +38,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version: "1.25.x"
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.8.0
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [test, lint]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v6
-        with:
-          go-version: stable
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
