@@ -1,3 +1,5 @@
+VERSION ?= $(shell git describe --tags --always --dirty)
+
 .PHONY: test lint build ci
 
 test:
@@ -7,6 +9,6 @@ lint:
 	golangci-lint run
 
 build:
-	go build -o tick .
+	go build -ldflags "-X main.version=$(VERSION)" -o tick .
 
 ci: lint test
