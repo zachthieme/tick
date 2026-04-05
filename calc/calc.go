@@ -1,4 +1,4 @@
-// calc/calc.go
+// Package calc provides weekday-aware countdown arithmetic.
 package calc
 
 import (
@@ -77,10 +77,10 @@ func countWeekdays(start, end time.Time) int {
 	return weekdays
 }
 
-// DateOnly truncates a time.Time to midnight in its location.
-// Unlike time.DateOnly (a layout string for Format/Parse), this returns a
-// new time.Time with the clock component zeroed out.
-func DateOnly(t time.Time) time.Time {
+// TruncateToDay returns a copy of t with the clock component zeroed out,
+// preserving the location. Use this instead of time.DateOnly, which is a
+// format-string constant, not a time.Time constructor.
+func TruncateToDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }
 

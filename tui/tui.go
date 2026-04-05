@@ -1,4 +1,4 @@
-// tui/tui.go
+// Package tui implements the Bubble Tea terminal dashboard for tick.
 package tui
 
 import (
@@ -71,7 +71,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 	case tickMsg:
 		if !m.todayOverride {
-			m.today = calc.DateOnly(time.Now())
+			m.today = calc.TruncateToDay(time.Now())
 		}
 		if m.readHosts != nil {
 			if n, err := m.readHosts(); err != nil {

@@ -11,7 +11,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        tickVersion = "0.1.0";
+        tickVersion = if (self ? rev) then self.shortRev else "dev";
 
         tick-src = pkgs.buildGoModule {
           pname = "tick";
@@ -21,7 +21,7 @@
 
           vendorHash = "sha256-3AGoHAxfwXaano2hYf0wa/VoYQmjZuRnpCr6QXTILMc=";
 
-          ldflags = [ "-s" "-w" ];
+          ldflags = [ "-s" "-w" "-X main.version=${tickVersion}" ];
 
           meta = with pkgs.lib; {
             description = "A terminal countdown timer for host upgrade scheduling";

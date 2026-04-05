@@ -42,7 +42,7 @@ func TestRunOnce(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			err := run(tt.args, &stdout, &stderr)
+			err := run(tt.args, strings.NewReader(""), &stdout, &stderr)
 			if err != nil {
 				t.Fatalf("run() returned error: %v", err)
 			}
@@ -91,7 +91,7 @@ func TestRunJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			err := run(tt.args, &stdout, &stderr)
+			err := run(tt.args, strings.NewReader(""), &stdout, &stderr)
 			if err != nil {
 				t.Fatalf("run() returned error: %v", err)
 			}
@@ -120,6 +120,11 @@ func TestRunValidationErrors(t *testing.T) {
 			name:    "missing hosts",
 			args:    []string{"--deadline", "2026-04-10", "--once"},
 			wantErr: "--hosts is required",
+		},
+		{
+			name:    "missing all flags shows help hint",
+			args:    []string{},
+			wantErr: "see --help",
 		},
 		{
 			name:    "zero hosts",
@@ -151,7 +156,7 @@ func TestRunValidationErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			err := run(tt.args, &stdout, &stderr)
+			err := run(tt.args, strings.NewReader(""), &stdout, &stderr)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -164,7 +169,7 @@ func TestRunValidationErrors(t *testing.T) {
 
 func TestRunVersion(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--version"}, &stdout, &stderr)
+	err := run([]string{"--version"}, strings.NewReader(""), &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("run(--version) returned error: %v", err)
 	}
@@ -175,7 +180,7 @@ func TestRunVersion(t *testing.T) {
 
 func TestRunHelp(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--help"}, &stdout, &stderr)
+	err := run([]string{"--help"}, strings.NewReader(""), &stdout, &stderr)
 	// flag.ErrHelp is returned by FlagSet with ContinueOnError
 	if err == nil {
 		t.Fatal("expected error for --help")
@@ -191,7 +196,7 @@ func TestRunHostsFile(t *testing.T) {
 	writeFile(t, path, "500\n")
 
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--today", "2026-04-06", "--once"}, &stdout, &stderr)
+	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--today", "2026-04-06", "--once"}, strings.NewReader(""), &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("run() returned error: %v", err)
 	}
@@ -207,7 +212,7 @@ func TestRunHostsFileJSON(t *testing.T) {
 	writeFile(t, path, "300\n")
 
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--today", "2026-04-06", "--json"}, &stdout, &stderr)
+	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--today", "2026-04-06", "--json"}, strings.NewReader(""), &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("run() returned error: %v", err)
 	}
@@ -226,7 +231,7 @@ func TestRunHostsFileMutuallyExclusive(t *testing.T) {
 	writeFile(t, path, "100\n")
 
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--hosts", "100", "--hosts-file", path, "--deadline", "2026-04-10", "--once"}, &stdout, &stderr)
+	err := run([]string{"--hosts", "100", "--hosts-file", path, "--deadline", "2026-04-10", "--once"}, strings.NewReader(""), &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for --hosts + --hosts-file")
 	}
@@ -237,9 +242,24 @@ func TestRunHostsFileMutuallyExclusive(t *testing.T) {
 
 func TestRunHostsFileMissing(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--hosts-file", "/nonexistent/hosts.txt", "--deadline", "2026-04-10", "--once"}, &stdout, &stderr)
+	err := run([]string{"--hosts-file", "/nonexistent/hosts.txt", "--deadline", "2026-04-10", "--once"}, strings.NewReader(""), &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for missing hosts file")
+	}
+}
+
+func TestRunHostsFileNegativeValue(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hosts.txt")
+	writeFile(t, path, "-5\n")
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--once"}, strings.NewReader(""), &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error for negative host count in file")
+	}
+	if !strings.Contains(err.Error(), "positive") {
+		t.Errorf("error = %q, want it to mention 'positive'", err.Error())
 	}
 }
 
@@ -249,7 +269,7 @@ func TestRunHostsFileBadContent(t *testing.T) {
 	writeFile(t, path, "not-a-number\n")
 
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--once"}, &stdout, &stderr)
+	err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--once"}, strings.NewReader(""), &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for invalid hosts file content")
 	}
@@ -257,11 +277,44 @@ func TestRunHostsFileBadContent(t *testing.T) {
 
 func TestRunUnexpectedArgument(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	err := run([]string{"--hosts", "100", "--deadline", "2026-04-10", "--once", "extra"}, &stdout, &stderr)
+	err := run([]string{"--hosts", "100", "--deadline", "2026-04-10", "--once", "extra"}, strings.NewReader(""), &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for unexpected argument")
 	}
 	if !strings.Contains(err.Error(), "unexpected argument") {
 		t.Errorf("error = %q, want it to contain 'unexpected argument'", err.Error())
+	}
+}
+
+func TestRunTUIQuit(t *testing.T) {
+	// Pipe "q" into stdin so the TUI exits immediately.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = w.Write([]byte("q"))
+	_ = w.Close()
+
+	var stdout, stderr bytes.Buffer
+	if err := run([]string{"--hosts", "100", "--deadline", "2026-04-10", "--today", "2026-04-06"}, r, &stdout, &stderr); err != nil {
+		t.Fatalf("TUI run() returned error: %v", err)
+	}
+}
+
+func TestRunTUIHostsFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hosts.txt")
+	writeFile(t, path, "500\n")
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = w.Write([]byte("q"))
+	_ = w.Close()
+
+	var stdout, stderr bytes.Buffer
+	if err := run([]string{"--hosts-file", path, "--deadline", "2026-04-10", "--today", "2026-04-06"}, r, &stdout, &stderr); err != nil {
+		t.Fatalf("TUI run() returned error: %v", err)
 	}
 }

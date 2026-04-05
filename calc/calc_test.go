@@ -95,6 +95,7 @@ func TestCalculate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := Calculate(tt.hosts, tt.deadline, tt.today)
 
 			if result.DeadlinePassed != tt.wantPassed {
@@ -116,6 +117,28 @@ func TestCalculate(t *testing.T) {
 				t.Errorf("Deadline = %v, want %v", result.Deadline, tt.deadline)
 			}
 		})
+	}
+}
+
+func TestCountWeekdaysEndBeforeStart(t *testing.T) {
+	// Exercises the defensive totalDays <= 0 branch in countWeekdays when
+	// end is before start (should never happen via Calculate, but the guard
+	// must return 0 rather than a negative count).
+	got := countWeekdays(date(2026, time.April, 10), date(2026, time.April, 5))
+	if got != 0 {
+		t.Errorf("countWeekdays(end < start) = %d, want 0", got)
+	}
+}
+
+func TestTruncateToDay(t *testing.T) {
+	input := time.Date(2026, time.April, 6, 14, 30, 45, 123, time.UTC)
+	got := TruncateToDay(input)
+	want := time.Date(2026, time.April, 6, 0, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Errorf("TruncateToDay() = %v, want %v", got, want)
+	}
+	if got.Location() != input.Location() {
+		t.Errorf("TruncateToDay() location = %v, want %v", got.Location(), input.Location())
 	}
 }
 

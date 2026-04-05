@@ -1,4 +1,5 @@
-// main.go
+// Tick is a terminal dashboard showing how many hosts to upgrade per weeknight
+// to meet a deadline.
 package main
 
 import (
@@ -52,7 +53,7 @@ type jsonResult struct {
 }
 
 func main() {
-	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
+	if err := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -75,7 +76,7 @@ func readHostsFile(path string) (int, error) {
 	return n, nil
 }
 
-func run(args []string, stdout, stderr io.Writer) error {
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("tick", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { _, _ = fmt.Fprintln(stderr, usage) }
@@ -101,6 +102,9 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("unexpected argument: %s", fs.Arg(0))
 	}
 
+	// fs.Visit only walks flags that were explicitly set on the command line,
+	// so we use it to distinguish "user passed --hosts 0" (an error) from
+	// "user omitted --hosts" (fall through to --hosts-file or required-field check).
 	hostsExplicit := false
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "hosts" {
@@ -122,10 +126,10 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("--hosts: value must be positive, got %d", *hosts)
 	}
 	if *hosts == 0 {
-		return fmt.Errorf("--hosts is required (or use --hosts-file)")
+		return fmt.Errorf("--hosts is required (or use --hosts-file); see --help")
 	}
 	if *deadlineStr == "" {
-		return fmt.Errorf("--deadline is required (YYYY-MM-DD)")
+		return fmt.Errorf("--deadline is required (YYYY-MM-DD); see --help")
 	}
 
 	deadline, err := time.ParseInLocation("2006-01-02", *deadlineStr, time.Local)
@@ -133,7 +137,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return fmt.Errorf("invalid deadline format: %s (expected YYYY-MM-DD)", *deadlineStr)
 	}
 
-	today := calc.DateOnly(time.Now())
+	today := calc.TruncateToDay(time.Now())
 	if *todayStr != "" {
 		today, err = time.ParseInLocation("2006-01-02", *todayStr, time.Local)
 		if err != nil {
@@ -174,7 +178,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	m := tui.New(*hosts, readHosts, deadline, today, *todayStr != "")
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithInput(stdin), tea.WithOutput(stdout))
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGHUP)
