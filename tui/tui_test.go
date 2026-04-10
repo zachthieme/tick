@@ -33,6 +33,7 @@ func TestView(t *testing.T) {
 			hosts:        100,
 			deadline:     date(2026, time.April, 10),
 			today:        date(2026, time.April, 6),
+			override:     true,
 			wantContains: []string{"hosts per night", "100 hosts left", "Deadline: 2026-04-10"},
 		},
 		{
@@ -53,7 +54,7 @@ func TestView(t *testing.T) {
 		{
 			name:        "no override hides start date",
 			hosts:       100,
-			deadline:    date(2026, time.April, 10),
+			deadline:    date(2030, time.January, 10),
 			today:       date(2026, time.April, 6),
 			wantMissing: []string{"Start:"},
 		},
@@ -62,6 +63,7 @@ func TestView(t *testing.T) {
 			hosts:        100,
 			deadline:     date(2026, time.April, 10),
 			today:        date(2026, time.April, 4), // Saturday
+			override:     true,
 			wantContains: []string{"next work night is Monday"},
 		},
 		{
@@ -69,6 +71,7 @@ func TestView(t *testing.T) {
 			hosts:       100,
 			deadline:    date(2026, time.April, 10),
 			today:       date(2026, time.April, 6), // Monday
+			override:    true,
 			wantMissing: []string{"next work night is Monday"},
 		},
 	}
@@ -126,6 +129,23 @@ func TestUpdateTickWithoutOverrideUpdatesToday(t *testing.T) {
 	}
 }
 
+func TestWindowResizeRefreshesToday(t *testing.T) {
+	// Even without a tick, a WindowSizeMsg should refresh today so the
+	// display is never stale when the user interacts with the terminal.
+	m := New(100, nil, date(2030, time.January, 10), date(2026, time.January, 1), false)
+	original := m.today
+
+	updated, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	if m.today.Equal(original) {
+		t.Error("WindowSizeMsg without override should update today from system clock")
+	}
+	if cmd != nil {
+		t.Error("WindowSizeMsg should not schedule a tick")
+	}
+}
+
 func TestQuitKeys(t *testing.T) {
 	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), false)
 
@@ -155,7 +175,7 @@ func TestViewEmptyBeforeResize(t *testing.T) {
 }
 
 func TestViewNarrowTerminalFallback(t *testing.T) {
-	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), false)
+	m := New(100, nil, date(2026, time.April, 10), date(2026, time.April, 6), true)
 	// 30 columns is too narrow for colossal figlet; should fall back to plain number.
 	m = withSize(m, 30, 20)
 	view := m.View()

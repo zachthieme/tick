@@ -24,7 +24,7 @@ var (
 type tickMsg time.Time
 
 func doTick() tea.Cmd {
-	return tea.Tick(time.Minute, func(t time.Time) tea.Msg {
+	return tea.Every(time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
@@ -60,6 +60,8 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -70,9 +72,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 	case tickMsg:
-		if !m.todayOverride {
-			m.today = calc.TruncateToDay(time.Now())
-		}
 		if m.readHosts != nil {
 			if n, err := m.readHosts(); err != nil {
 				m.err = err.Error()
@@ -81,10 +80,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.err = ""
 			}
 		}
-		m.result = calc.Calculate(m.totalHosts, m.deadline, m.today)
-		return m, doTick()
+		cmd = doTick()
 	}
-	return m, nil
+
+	// Refresh date and recalculate on every message, not just ticks.
+	// This ensures the display stays current even if the tick chain stalls
+	// (e.g. after system sleep or terminal state changes).
+	if !m.todayOverride {
+		m.today = calc.TruncateToDay(time.Now())
+	}
+	m.result = calc.Calculate(m.totalHosts, m.deadline, m.today)
+
+	return m, cmd
 }
 
 func (m Model) View() string {
